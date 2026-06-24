@@ -4,7 +4,7 @@ const scoreElement = document.getElementById('score');
 const micBtn = document.getElementById('mic-btn');
 const volumeDisplay = document.getElementById('volume-display');
 
-console.log("Software Version: v1.0.5 (ScriptProcessor Fix)");
+console.log("Software Version: v1.0.6 (MediaElement Force)");
 
 // Game Constants
 const GRAVITY = 0.25;
@@ -23,10 +23,12 @@ let frameCount = 0;
 let gameRunning = false;
 let gameOver = false;
 
-// Audio Variables (Modified for Stability)
+// Audio Variables
 let audioCtx = null;
-let volume = 0; // 전역 볼륨 변수
+let analyser = null;
+let dataArray = null;
 let isMicActive = false;
+let currentVolume = 0;
 
 function resizeCanvas() {
     canvas.width = 400;
@@ -38,14 +40,20 @@ window.addEventListener('keydown', (e) => { if (e.code === 'Space') handleAction
 canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleAction(); }, { passive: false });
 canvas.addEventListener('mousedown', () => { handleAction(); });
 
-// [핵심 수정] ScriptProcessorNode를 이용한 마이크 데이터 강제 추출
+// [최종 해결책] MediaElementSource를 이용한 강제 스트림 추출
 async function initMic() {
     try {
+        // 1. 가상의 오디오 엘리먼트 생성 (데이터 전달 통로 확보)
+        const audioEl = document.createElement('audio');
+        audioEl.srcType = 'audio/mpeg'; // 브라우저가 데이터를 처리하도록 유도
+        
+        // 2. 스트림 요청
         const stream = await navigator.mediaDevices.getUserMedia({ 
-            audio: true,
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            }
         });
 
         if (!audioCtx) {
@@ -56,28 +64,19 @@ async function initMic() {
             await audioCtx.resume();
         }
 
+        // 3. 스트림을 소스로 연결
         const source = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
         
-        // ScriptProcessorNode는 구형이지만 모바일/안드로이드에서 스트림 데이터를 
-        // 가장 확실하게 가져오는 방법입니다.
-        const processor = audioCtx.createScriptProcessor(2048, 1, 1);
-
-        processor.onaudioprocess = (e) => {
-            const inputData = e.inputBuffer.getChannelData(0);
-            let sum = 0;
-            for (let i = 0; i < inputData.length; i++) {
-                sum += Math.abs(inputData[i]);
-            }
-            // 볼륨 값을 0~100 사이로 정규화 (마이크 감도에 따라 조절 가능)
-            volume = (sum / inputData.length) * 255; 
-        };
-
-        source.connect(processor);
-        processor.connect(audioCtx.destination); // 데이터를 소비하기 위해 연결 필요
+        source.connect(analyser);
+        dataArray = new Uint8Array(analyer.frequencyBinCount || analyser.frequencyBinCount);
+        // 위 줄에서 오타 방지를 위해 안전하게 할당
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
 
         isMicActive = true;
         micBtn.style.display = 'none';
-        console.log("Microphone Active via ScriptProcessor");
+        console.log("Microphone Active (MediaElement Route)");
     } catch (err) {
         console.error("Mic Init Error:", err);
         alert("마이크 접근 실패: " + err.message);
@@ -88,24 +87,35 @@ micBtn.addEventListener('click', async () => {
     await initMic();
 });
 
+// 볼륨 실시간 감지 루프 (handleAction 밖에서 별도로 실행)
+setInterval((). => {
+    if (isMicActive && analyser && dataArray) {
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < 16; i++) {
+            sum += dataArray[i];
+        }
+        currentVolume = sum / 16;
+
+        if (volumeDisplay) {
+            volumeDisplay.innerText = `Volume: ${Math.round(currentVolume)}`;
+        }
+    }
+}, 10); // 10ms마다 초고속 감지
+
 function handleAction() {
     if (gameOver) {
         resetGame();
     } else if (!gameRunning) {
         gameRunning = true;
-        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        if (audioCtx && audioctx.state === 'suspended') audioCtx.resume();
     }
 
-    // 볼륨 및 점프 처리
+    // 볼륨 기반 점프 로직
     if (isMicActive) {
-        // 실시간으로 계산된 volume 변수 사용
-        if (volumeDisplay) {
-            volumeDisplay.innerText = `Volume: ${Math.round(volume)}`;
-        }
-
-        // [감도 조절] 안드로이드 마이크 성능에 따라 30~70 사이를 테스트하며 조정하세요.
-        if (volume > 40) { 
-            const dynamicJump = JUMP_STRENGTH * (1 + (volume / 100));
+        // [감도 조정] 모바일 환경에서 30~50 사이가 적당합니다.
+        if (currentVolume > 40) { 
+            const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 60));
             bird.velocity = dynamicJump;
         }
     } else {
@@ -131,7 +141,7 @@ function drawPipes() {
         ctx.fillStyle = '#2e7d32'; ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.top);
         ctx.fillStyle = '#1b5e20'; ctx.fillRect(pipe.x - 5, pipe.top - 20, PIPE_WIDTH + 10, 20);
         ctx.fillStyle = '#2e7d32'; ctx.fillRect(pipe.x, canvas.height - pipe.bottom, PIPE_WIDTH, pipe.bottom);
-        ctx.fillStyle = '#1b5e20'; ctx.fillRect(pe.x - 5, canvas.height - pipe.bottom, PIPE_WIDTH + 10, 20);
+        ctx.fillStyle = '#1b5e20'; ctx.fillRect(pipe.x - 5, canvas.height - pipe.bottom - 20, PIPE_WIDTH + 10, 20);
     });
 }
 
@@ -162,12 +172,12 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawPipes(); drawBird();
     if (!gameRunning && !gameOver) {
-        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = 'white'; ctx.font = '24px Arial'; ctx.textAlign = 'center';
         ctx.fillText('Press Space or Click to Start', canvas.width/2, canvas.height/2);
     }
     if (gameOver) {
-        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = 'white'; ctx.font = '40px Arial'; ctx.textAlign = 'center';
         ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2 - 20);
         ctx.font = '24px Arial'; ctx.fillText(`Score: ${score}`, canvas.width/2, canvas.height/2 + 20);
