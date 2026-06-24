@@ -32,6 +32,7 @@ let gameRunning = false;
 let gameOver = false;
 
 // Audio Variables
+
 let audioCtx = null;
 let analyser = null;
 let dataArray = null;
@@ -56,7 +57,8 @@ canvas.addEventListener('mousedown', () => {
     handleAction();
 });
 
-// 핵심 수정 부분: 마이크 초기화 로직 강화
+// game.js 내 관련 변수 및 함수 재정의
+
 async function initMic() {
     try {
         // 1. 스트림 요청
@@ -67,16 +69,17 @@ async function initMic() {
             autoGainControl: true
         });
 
-        // 2. AudioContext 생성 및 강제 Resume
+        // 2. AudioContext 생성 및 강제 Resume (모바일 대응)
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
         
-        if (audioCtx.state === 'suspended' || audioCtx.state === 'inactive') {
+        // 엔진이 꺼져있다면 다시 깨움
+        if (audioCtx.state === 'suspended' || audioctx.state === 'inactive') {
             await audioCtx.resume();
         }
 
-        // 3. 분석기 연결 (가장 확실한 표준 파이프라인)
+        // 3. 분석기 연결 및 스트림 재연결
         const source = audioCtx.createMediaStreamSource(stream);
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 256;
@@ -86,50 +89,57 @@ async function initMic() {
         isMicActive = true;
         micBtn.style.display = 'none';
         
-        console.log("Microphone Initialized Successfully");
+        console.log("Microphone Active & Engine Resumed");
     } catch (err) {
         console.error("Mic Init Error:", err);
         alert("마이크 접근 실패: " + err.message);
     }
 }
 
-micBtn.addEventListener('click', () => {
-    initMic();
+// 마이크 시작 버튼 클릭 시 엔진을 한 번 더 깨움
+micBtn.addEventListener('click', async () => {
+    await initMic();
+    if (audioCtx) {
+        await audioCtx.resume(); // 클릭 시점에 강제 Resume 실행
+    }
 });
 
 function handleAction() {
+    // 게임 종료/시작 상태 처리
     if (gameOver) {
         resetGame();
     } else if (!gameRunning) {
         gameRunning = true;
+        // 게임 시작 버튼이나 터치 시 엔진 재확인
         if (audioCtx && audioCtx.state === 'suspended') {
             audioCtx.resume();
         }
     }
 
-    // 볼륨 및 점프 처리 로직
+    // 마이크 입력 처리 로직
     if (isMicActive && analyser && dataArray) {
+        // 브라우저가 데이터를 갱신하도록 강제 호출
         analyser.getByteFrequencyData(dataArray);
         
-        // 저음역대(0~15번 인덱스) 평균 추출 - 모바일 마이크 반응성 최적화
         let sum = 0;
         for (let i = 0; i < 16; i++) {
             sum += dataArray[i];
         }
         let volume = sum / 16;
 
+        // 볼륨 표시 (실시간 확인용)
         if (volumeDisplay) {
             volumeDisplay.innerText = `Volume: ${Math.round(volume)}`;
         }
 
-        // 볼륨이 일정 수준 이상일 때 점프 실행
-        // 안드로이드 마이크 감도에 따라 30~60 사이를 조절하세요.
+        // 점프 로직: 안드로이드 마이크 감도는 보통 30~60 사이입니다.
+        // 볼륨이 너무 작으면 숫자를 낮추고, 민감하면 높이세요.
         if (volume > 45) { 
             const dynamicJump = JUMP_STRENGTH * (1 + (volume / 50));
             bird.velocity = dynamicJump;
         }
     } else {
-        // 마이크 미사용 시 기본 점프
+        // 마이크 미사용 시 기본 점프 동작
         bird.velocity = JUMP_STRENGTH;
     }
 }
