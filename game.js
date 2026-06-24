@@ -4,7 +4,7 @@ const scoreElement = document.getElementById('score');
 const micBtn = document.getElementById('mic-btn');
 const volumeDisplay = document.getElementById('volume-display');
 
-console.log("Software Version: v1.0.6 (MediaElement Force)");
+console.log("Software Version: v1.0.6 (Permission Fix)");
 
 // Game Constants
 const GRAVITY = 0.25;
@@ -35,60 +35,45 @@ function resizeCanvas() {
     canvas.height = 600;
 }
 
-// Input Handling
-window.addEventListener('keydown', (e) => { if (e.code === 'Space') handleAction(); });
-canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleAction(); }, { passive: false });
-canvas.addEventListener('mousedown', () => { handleAction(); });
-
-// [최종 해결책] MediaElementSource를 이용한 강제 스트림 추출
-async function initMic() {
+// [제시해주신 함수를 기반으로 한 마이크 초기화]
+async function getMicrophoneAccess() {
     try {
-        // 1. 가상의 오디오 엘리먼트 생성 (데이터 전달 통로 확보)
-        const audioEl = document.createElement('audio');
-        audioEl.srcType = 'audio/mpeg'; // 브라우저가 데이터를 처리하도록 유도
-        
-        // 2. 스트림 요청
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            }
-        });
+        // 1. 마이크 스트림 요청 (권한 확인 및 스트림 확보)
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log("마이크 권한 획득 성공!");
 
+        // 2. AudioContext 생성 (사용자 상호작석 직후 호출되어야 함)
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
-        
-        if (audioCtx.state === 'suspended') {
+
+        // 엔진 상태 확인 및 Resume
+        if (audioCtx.state === 'suspended' || audioCtx.state === 'inactive') {
             await audioCtx.resume();
         }
 
-        // 3. 스트림을 소스로 연결
+        // 3. 스트림을 분석기에 연결
         const source = audioCtx.createMediaStreamSource(stream);
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 256;
-        
         source.connect(analyser);
-        dataArray = new Uint8Array(analyer.frequencyBinCount || analyser.frequencyBinCount);
-        // 위 줄에서 오타 방지를 위해 안전하게 할당
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
 
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
         isMicActive = true;
         micBtn.style.display = 'none';
-        console.log("Microphone Active (MediaElement Route)");
+
+        // 별도의 루프를 돌려 볼륨 값을 지속적으로 갱신 (handleAction과 분리)
+        updateVolumeLoop();
+
+        console.log("마이크 데이터 파이프라인 연결 완료!");
     } catch (err) {
-        console.error("Mic Init Error:", err);
-        alert("마이크 접근 실패: " + err.message);
+        console.error("마이크 접근 거부됨: ", err);
+        alert("마이크 사용 권한이 필요합니다. 브라우저 설정에서 권한을 확인해주세요.");
     }
 }
 
-micBtn.addEventListener('click', async () => {
-    await initMic();
-});
-
-// 볼륨 실시간 감지 루프 (handleAction 밖에서 별도로 실행)
-setInterval((). => {
+// 볼륨 값을 초고속으로 감지하는 루프
+function updateVolumeLoop() {
     if (isMicActive && analyser && dataArray) {
         analyser.getByteFrequencyData(dataArray);
         let sum = 0;
@@ -101,19 +86,30 @@ setInterval((). => {
             volumeDisplay.innerText = `Volume: ${Math.round(currentVolume)}`;
         }
     }
-}, 10); // 10ms마다 초고속 감지
+    requestAnimationFrame(updateVolumeLoop);
+}
+
+// 버튼 클릭 시 권한 함수 실행
+micBtn.addEventListener('click', async () => {
+    await getMicrophoneAccess();
+});
+
+// Input Handling
+window.addEventListener('keydown', (e) => { if (e.code === 'Space') handleAction(); });
+canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleAction(); }, { passive: false });
+canvas.addEventListener('mousedown', ()0 => { handleAction(); });
 
 function handleAction() {
     if (gameOver) {
         resetGame();
     } else if (!gameRunning) {
         gameRunning = true;
-        if (audioCtx && audioctx.state === 'suspended') audioCtx.resume();
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     }
 
     // 볼륨 기반 점프 로직
     if (isMicActive) {
-        // [감도 조정] 모바일 환경에서 30~50 사이가 적당합니다.
+        // [감도 조정] 모바일 환경에서 30~60 사이를 테스트하며 조정하세요.
         if (currentVolume > 40) { 
             const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 60));
             bird.velocity = dynamicJump;
