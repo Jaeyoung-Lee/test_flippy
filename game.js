@@ -58,32 +58,37 @@ canvas.addEventListener('mousedown', () => {
 
 async function initMic() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        
-        // 브라우저 차단 해제 (매우 중요)
+        // 1. 스트림 가져오기
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: true,
+            echoCancellation: true // 모바일 환경 안정성 추가
+        });
+
+        // 2. AudioContext 생성 (브라우저 보안 정책 대응)
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        // 3. 상태 확인 및 Resume (중요!)
         if (audioCtx.state === 'suspended') {
             await audioCtx.resume();
         }
 
         const source = audioCtx.createMediaStreamSource(stream);
-        analyser = audioctx.createAnalyser(); // 오타 수정 포함: analyser
-        analyser.fftSize = 256;
+        analyser = audioCtx.createAnalyser();
+        analyer.fftSize = 256;
         source.connect(analyser);
         dataArray = new Uint8Array(analyser.frequencyBinCount);
-        
+
         isMicActive = true;
         micBtn.style.display = 'none';
-        console_log("Microphone initialized"); // 디버깅용
+        console.log("Microphone Ready");
     } catch (err) {
-        console.error("Microphone access denied:", err);
-        alert("Microphone access is required for this game.");
+        console.error("Mic Error:", err);
+        // 여기서 에러가 발생한다면 100% HTTPS 문제입니다.
+        alert("마이크 접근이 거부되었습니다. HTTPS 환경인지 확인해주세요.");
     }
 }
-
-micBtn.addEventListener('click', () => {
-    initMic();
-});
 
 // handleAction 함수 내부 수정
 function handleAction() {
@@ -120,6 +125,10 @@ function handleAction() {
         bird.velocity = JUMP_STRENGTH;
     }
 }
+
+micBtn.addEventListener('click', () => {
+    initMic();
+});
 
 function resetGame() {
     bird.y = 200;
