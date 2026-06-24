@@ -2,6 +2,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreElement = document.getElementById('score');
 const micBtn = document.getElementById('mic-btn');
+const volumeDisplay = document.getElementById('volume-display');
 
 // Game Constants
 const GRAVITY = 0.25;
@@ -81,12 +82,12 @@ function handleAction() {
         resetGame();
     } else if (!gameRunning) {
         gameRunning = true;
-        if (isMicActive) {
+        if (isMicActive && audioCtx) {
             audioCtx.resume();
         }
     }
 
-    if (isMicActive && audioCtx) {
+    if (isMicActive && analyser && dataArray) {
         analyser.getByteFrequencyData(dataArray);
         let volume = 0;
         for (let i = 0; i < dataArray.length; i++) {
@@ -94,12 +95,19 @@ function handleAction() {
         }
         volume /= dataArray.length;
 
-        // Map volume to jump strength (sensitivity)
-        // Adjust threshold and multiplier as needed
-        if (volume > 30) {
-            bird.velocity = JUMP_STRENGTH * (1 + (volume / 50));
+        // Update display
+        if (volumeDisplay) {
+            volumeDisplay.innerText = `Volume: ${Math.round(volume)}`;
+        }
+
+        // Jump logic based on volume
+        // If volume is above a certain threshold, apply jump strength modulated by volume
+        if (volume > 20) { // Threshold adjusted to be more sensitive
+            const dynamicJump = JUMP_STRENGTH * (1 + (volume / 30));
+            bird.velocity = dynamicJump;
         }
     } else {
+        // Fallback for non-mic input (click/space/touch)
         bird.velocity = JUMP_STRENGTH;
     }
 }
