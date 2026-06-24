@@ -60,13 +60,21 @@ async function initMic() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // 브라우저 차단 해제 (매우 중요)
+        if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+        }
+
         const source = audioCtx.createMediaStreamSource(stream);
-        analyser = audioCtx.createAnalyser();
-        source.connect(analyser);
+        analyser = audioctx.createAnalyser(); // 오타 수정 포함: analyser
         analyser.fftSize = 256;
+        source.connect(analyser);
         dataArray = new Uint8Array(analyser.frequencyBinCount);
+        
         isMicActive = true;
         micBtn.style.display = 'none';
+        console_log("Microphone initialized"); // 디버깅용
     } catch (err) {
         console.error("Microphone access denied:", err);
         alert("Microphone access is required for this game.");
@@ -77,12 +85,14 @@ micBtn.addEventListener('click', () => {
     initMic();
 });
 
+// handleAction 함수 내부 수정
 function handleAction() {
     if (gameOver) {
         resetGame();
     } else if (!gameRunning) {
         gameRunning = true;
-        if (isMicActive && audioCtx) {
+        // 게임 시작 시 오디오 컨텍스트 재확인 및 Resume
+        if (audioCtx && audioCtx.state === 'suspended') {
             audioCtx.resume();
         }
     }
@@ -90,24 +100,23 @@ function handleAction() {
     if (isMicActive && analyser && dataArray) {
         analyser.getByteFrequencyData(dataArray);
         let volume = 0;
-        for (let i = 0; i < dataArray.length; i++) {
+        // 저음역대 위주로 샘플링하여 반응성 높임
+        for (let i = 0; i < 10; i++) {
             volume += dataArray[i];
         }
-        volume /= dataArray.length;
+        volume /= 10;
 
-        // Update display
         if (volumeDisplay) {
             volumeDisplay.innerText = `Volume: ${Math.round(volume)}`;
         }
 
-        // Jump logic based on volume
-        // If volume is above a certain threshold, apply jump strength modulated by volume
-        if (volume > 20) { // Threshold adjusted to be more sensitive
-            const dynamicJump = JUMP_STRENGTH * (1 + (volume / 30));
+        // 소리 크기에 따른 점프 감도 조절
+        if (volume > 30) { // 민감도에 따라 20~50 사이 조정 가능
+            const dynamicJump = JUMP_STRENGTH * (1 + (volume / 40));
             bird.velocity = dynamicJump;
         }
     } else {
-        // Fallback for non-mic input (click/space/touch)
+        // 마이크 미사용 시 기본 점프
         bird.velocity = JUMP_STRENGTH;
     }
 }
