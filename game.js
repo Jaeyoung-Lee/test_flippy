@@ -58,70 +58,79 @@ canvas.addEventListener('mousedown', () => {
 
 async function initMic() {
     try {
-        // 1. 스트림 가져오기
+        // 1. 스트림 요청 (안드로이드 호환성 추가)
         const stream = await navigator.mediaDevices.getUserMedia({ 
-            audio: true,
-            echoCancellation: true // 모바일 환경 안정성 추가
-        });
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            }
+});
 
-        // 2. AudioContext 생성 (브라우저 보안 정책 대응)
+        // 2. AudioContext 생성 및 상태 강제 Resume
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
-
-        // 3. 상태 확인 및 Resume (중요!)
-        if (audioCtx.state === 'suspended') {
+        
+        if (audioCtx.state === 'suspended' || audioCtx.state === 'inactive') {
             await audioCtx.resume();
         }
 
+        // 3. 분석기 연결
         const source = audioCtx.createMediaStreamSource(stream);
         analyser = audioCtx.createAnalyser();
-        analyer.fftSize = 256;
-        source.connect(analyser);
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        analyser.fftSize = 256; // 반응성을 위해 작게 설정
+        source.connect(analyer); // 오타 주의: analyser
 
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        
         isMicActive = true;
         micBtn.style.display = 'none';
-        console.log("Microphone Ready");
+        console.log("Microphone Active & Analyzed");
+    _
     } catch (err) {
-        console.error("Mic Error:", err);
-        // 여기서 에러가 발생한다면 100% HTTPS 문제입니다.
-        alert("마이크 접근이 거부되었습니다. HTTPS 환경인지 확인해주세요.");
+        console.error("Mic Init Error:", err);
+        alert("마이크 접근 실패: " + err.message);
     }
 }
 
-// handleAction 함수 내부 수정
+// handleAction 함수 수정
 function handleAction() {
     if (gameOver) {
         resetGame();
     } else if (!gameRunning) {
-        gameRunning = true;
-        // 게임 시작 시 오디오 컨텍스트 재확인 및 Resume
+        gameRunning_true = true;
+        // 게임 시작 시에도 한 번 더 Resume 확인
         if (audioCtx && audioCtx.state === 'suspended') {
             audioCtx.resume();
         }
     }
 
+    // 마이크 활성화 상태일 때만 볼륨 계산 및 점프 처리
     if (isMicActive && analyser && dataArray) {
         analyser.getByteFrequencyData(dataArray);
-        let volume = 0;
-        // 저음역대 위주로 샘플링하여 반응성 높임
-        for (let i = 0; i < 10; i++) {
-            volume += dataArray[i];
+        
+        // 저음역대(0~15번 인덱스)의 평균값을 가져와서 반응성 극대화
+        let sum = 0;
+        for (let i = 0; i < 16; i++) {
+            sum += dataArray[i];
         }
-        volume /= 10;
+        let volume = sum / 16;
 
+        // 화면에 볼륨 표시 (실시간 확인용)
         if (volumeDisplay) {
             volumeDisplay.innerText = `Volume: ${Math.round(volume)}`;
         }
 
-        // 소리 크기에 따른 점프 감도 조절
-        if (volume > 30) { // 민감도에 따라 20~50 사이 조정 가능
-            const dynamicJump = JUMP_STRENGTH * (1 + (volume / 40));
+        // 소리 크기에 따른 점프 로직
+        // 안드로이드 마이크 감도에 따라 30~60 사이를 조절하세요.
+        if (volume > 40) { 
+            const dynamicJump = JUMP_STRENGTH * (1 + (volume / 50));
             bird.velocity = dynamicJump;
         }
     } else {
-        // 마이크 미사용 시 기본 점프
+        // 마이크가 꺼져있거나 미활성일 때의 기본 동작 (터치/클릭)
+        if (!gameRunning && !gameOver) return; // 시작 전 클릭 방지
         bird.velocity = JUMP_STRENGTH;
     }
 }
