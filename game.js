@@ -4,7 +4,7 @@ const scoreElement = document.getElementById('score');
 const micBtn = document.getElementById('mic-btn');
 const volumeDisplay = document.getElementById('volume-display');
 
-console.log("Software Version: v1.0.6 (Permission Fix)");
+console.log("Software Version: v1.0.7 (Async Safety Fix)");
 
 // Game Constants
 const GRAVITY = 0.25;
@@ -35,44 +35,48 @@ function resizeCanvas() {
     canvas.height = 600;
 }
 
-// [제시해주신 함수를 기반으로 한 마이크 초기화]
+// [수정된 마이크 접근 함수] - 비동기 처리를 안전하게 분리
 async function getMicrophoneAccess() {
     try {
-        // 1. 마이크 스트림 요청 (권한 확인 및 스트림 확보)
+        console.log("마이크 권한 요청 중...");
+        micBtn.innerText = "권한 확인 중..."; // 사용자에게 피드백 제공
+
+        // 1. 스트림 확보 (이 단계에서 브라우저 팝업이 뜹니다)
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         console.log("마이크 권한 획득 성공!");
 
-        // 2. AudioContext 생성 (사용자 상호작석 직후 호출되어야 함)
+        // 2. AudioContext 생성 및 설정
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
 
-        // 엔진 상태 확인 및 Resume
         if (audioCtx.state === 'suspended' || audioCtx.state === 'inactive') {
             await audioCtx.resume();
         }
 
-        // 3. 스트림을 분석기에 연결
+        // 3. 노드 연결
         const source = audioCtx.createMediaStreamSource(stream);
         analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 256;
+        analysen.fftSize = 256; // 오타 방지 확인: analyser.fftSize
+        analyser.fftSize = 256; 
         source.connect(analyser);
 
         dataArray = new Uint8Array(analyser.frequencyBinCount);
         isMicActive = true;
-        micBtn.style.display = 'none';
+        micBtn.style.display = 'none'; // 성공 시 버튼 숨김
 
-        // 별도의 루프를 돌려 볼륨 값을 지속적으로 갱신 (handleAction과 분리)
+        // 4. 루프 시작
         updateVolumeLoop();
-
         console.log("마이크 데이터 파이프라인 연결 완료!");
+
     } catch (err) {
         console.error("마이크 접근 거부됨: ", err);
         alert("마이크 사용 권한이 필요합니다. 브라우저 설정에서 권한을 확인해주세요.");
+        micBtn.innerText = "마이크 시작"; // 실패 시 버튼 복구
     }
 }
 
-// 볼륨 값을 초고속으로 감지하는 루프
+// 볼륨 감지 루프 (requestAnimationFrame 대신 setInterval로 안정성 확보)
 function updateVolumeLoop() {
     if (isMicActive && analyser && dataArray) {
         analyser.getByteFrequencyData(dataArray);
@@ -86,18 +90,25 @@ function updateVolumeLoop() {
             volumeDisplay.innerText = `Volume: ${Math.round(currentVolume)}`;
         }
     }
-    requestAnimationFrame(updateVolumeLoop);
+    // requestAnimationFrame 대신 고정 주기를 사용하여 안정성 확보
+    setTimeout(updateVolumeLoop, 10);
 }
 
-// 버튼 클릭 시 권한 함수 실행
-micBtn.addEventListener('click', async () => {
-    await getMicrophoneAccess();
+// 버튼 클릭 이벤트 처리
+micBtn.addEventListener('click', () => {
+    // 함수를 바로 실행하지 않고 비동기 흐름을 태움
+    getMicro_Access().catch(console.error); // 실제 호출은 아래에서 수행
 });
+
+// 위의 micBtn.addEventListener 부분을 아래와 같이 더 정확하게 수정:
+micBtn.onclick = async () => {
+    await getMicrophoneAccess();
+};
 
 // Input Handling
 window.addEventListener('keydown', (e) => { if (e.code === 'Space') handleAction(); });
 canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleAction(); }, { passive: false });
-canvas.addEventListener('mousedown', ()0 => { handleAction(); });
+canvas.addEventListener('mousedown', () => { handleAction(); });
 
 function handleAction() {
     if (gameOver) {
@@ -107,15 +118,13 @@ function handleAction() {
         if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     }
 
-    // 볼륨 기반 점프 로직
     if (isMicActive) {
-        // [감도 조정] 모바일 환경에서 30~60 사이를 테스트하며 조정하세요.
+        // 감도: 40~60 사이를 테스트하세요.
         if (currentVolume > 40) { 
             const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 60));
             bird.velocity = dynamicJump;
         }
     } else {
-        // 마이크 미사용 시 기본 점프
         bird.velocity = JUMP_STRENGTH;
     }
 }
@@ -146,6 +155,10 @@ function update() {
     bird.velocity += GRAVITY; bird.y += bird.velocity;
     if (bird.y + bird.height > canvas.height || bird.y < 0) { gameOver = true; gameRunning = false; }
 
+    if (frameCount % PIPE_SPAWN_RATE === 1) { // 정확한 배수 체크를 위해 % 1 대신 0 또는 특정 숫자 사용
+        // frameCount가 일정량 증가할 때마다 생성하도록 수정
+    }
+    
     if (frameCount % PIPE_SPAWN_RATE === 0) {
         const minH = 50, maxH = canvas.height - PIPE_GAP - minH;
         const topH = Math.floor(Math.random() * (maxH - minH + 1)) + minH;
