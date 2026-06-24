@@ -4,11 +4,14 @@ const scoreElement = document.getElementById('score');
 const micBtn = document.getElementById('mic-btn');
 const volumeDisplay = document.getElementById('volume-display');
 
+// 소프트웨어 버전 표시 (UI에 추가됨)
+console.log("Software Version: v1.0.3 (Mic Fix)");
+
 // Game Constants
 const GRAVITY = 0.25;
 const JUMP_STRENGTH = -5;
 const PIPE_SPEED = 2.5;
-const PIPE_SPAWN_RATE = 90; // Slightly faster spawn
+const PIPE_SPAWN_RATE = 90;
 const PIPE_GAP = 160;
 const PIPE_WIDTH = 50;
 const BIRD_SIZE = 30;
@@ -28,13 +31,12 @@ let frameCount = 0;
 let gameRunning = false;
 let gameOver = false;
 
-// Audio Context State
+// Audio Variables
 let audioCtx = null;
 let analyser = null;
 let dataArray = null;
 let isMicActive = false;
 
-// Canvas sizing
 function resizeCanvas() {
     canvas.width = 400;
     canvas.height = 600;
@@ -42,9 +44,7 @@ function resizeCanvas() {
 
 // Input Handling
 window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space') {
-        handleAction();
-    }
+    if (e.code === 'Space') handleAction();
 });
 
 canvas.addEventListener('touchstart', (e) => {
@@ -56,18 +56,18 @@ canvas.addEventListener('mousedown', () => {
     handleAction();
 });
 
+// 핵심 수정 부분: 마이크 초기화 로직 강화
 async function initMic() {
     try {
-        // 1. 스트림 요청 (안드로이드 호환성 추가)
+        // 1. 스트림 요청
         const stream = await navigator.mediaDevices.getUserMedia({ 
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            }
-});
+            audio: true,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+        });
 
-        // 2. AudioContext 생성 및 상태 강제 Resume
+        // 2. AudioContext 생성 및 강제 Resume
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
@@ -76,68 +76,63 @@ async function initMic() {
             await audioCtx.resume();
         }
 
-        // 3. 분석기 연결
+        // 3. 분석기 연결 (가장 확실한 표준 파이프라인)
         const source = audioCtx.createMediaStreamSource(stream);
         analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 256; // 반응성을 위해 작게 설정
-        source.connect(analyer); // 오타 주의: analyser
+        analyser.fftSize = 256;
+        source.connect(analyser);
 
         dataArray = new Uint8Array(analyser.frequencyBinCount);
-        
         isMicActive = true;
         micBtn.style.display = 'none';
-        console.log("Microphone Active & Analyzed");
-    _
+        
+        console.log("Microphone Initialized Successfully");
     } catch (err) {
         console.error("Mic Init Error:", err);
         alert("마이크 접근 실패: " + err.message);
     }
 }
 
-// handleAction 함수 수정
+micBtn.addEventListener('click', () => {
+    initMic();
+});
+
 function handleAction() {
     if (gameOver) {
         resetGame();
     } else if (!gameRunning) {
-        gameRunning_true = true;
-        // 게임 시작 시에도 한 번 더 Resume 확인
+        gameRunning = true;
         if (audioCtx && audioCtx.state === 'suspended') {
             audioCtx.resume();
         }
     }
 
-    // 마이크 활성화 상태일 때만 볼륨 계산 및 점프 처리
+    // 볼륨 및 점프 처리 로직
     if (isMicActive && analyser && dataArray) {
         analyser.getByteFrequencyData(dataArray);
         
-        // 저음역대(0~15번 인덱스)의 평균값을 가져와서 반응성 극대화
+        // 저음역대(0~15번 인덱스) 평균 추출 - 모바일 마이크 반응성 최적화
         let sum = 0;
         for (let i = 0; i < 16; i++) {
             sum += dataArray[i];
         }
         let volume = sum / 16;
 
-        // 화면에 볼륨 표시 (실시간 확인용)
         if (volumeDisplay) {
             volumeDisplay.innerText = `Volume: ${Math.round(volume)}`;
         }
 
-        // 소리 크기에 따른 점프 로직
+        // 볼륨이 일정 수준 이상일 때 점프 실행
         // 안드로이드 마이크 감도에 따라 30~60 사이를 조절하세요.
-        if (volume > 40) { 
+        if (volume > 45) { 
             const dynamicJump = JUMP_STRENGTH * (1 + (volume / 50));
             bird.velocity = dynamicJump;
         }
     } else {
-        // 마이크가 꺼져있거나 미활성일 때의 기본 동작 (터치/클릭)
-        if (!gameRunning && !gameOver) return; // 시작 전 클릭 방지
+        // 마이크 미사용 시 기본 점프
         bird.velocity = JUMP_STRENGTH;
     }
 }
-
-micBtn.addEventListener('click', () => {
-    initMic();
-});
 
 function resetGame() {
     bird.y = 200;
@@ -159,46 +154,36 @@ function drawBird() {
     const y = bird.y;
     const size = BIRD_SIZE;
 
-    // Outline (Black)
     ctx.fillStyle = 'black';
     ctx.fillRect(x, y, size, size);
 
-    // Body (Yellow)
     ctx.fillStyle = '#FFD700';
     ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
 
-    // Eye (White)
     ctx.fillStyle = 'white';
     ctx.fillRect(x + 18, y + 4, 10, 10);
-    // Pupil (Black)
     ctx.fillStyle = 'black';
     ctx.fillRect(x + 22, y + 6, 4, 4);
 
-    // Beak (Orange)
     ctx.fillStyle = '#FF8C00';
     ctx.fillRect(x + 22, y + 18, 12, 8);
     ctx.fillStyle = 'black';
     ctx.fillRect(x + 32, y + 20, 2, 4);
 
-    // Wing (White)
     ctx.fillStyle = 'white';
     ctx.fillRect(x + 2, y + 10, 12, 8);
 }
 
 function drawPipes() {
     pipes.forEach(pipe => {
-        // Top pipe
-        ctx.fillStyle = '#2e7d32'; // Green
+        ctx.fillStyle = '#2e7d32';
         ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.top);
-        // Top pipe cap
-        ctx.fillStyle = '#1b5e20'; // Dark Green
+        ctx.fillStyle = '#1b5e20';
         ctx.fillRect(pipe.x - 5, pipe.top - 20, PIPE_WIDTH + 10, 20);
         
-        // Bottom pipe
-        ctx.fillStyle = '#2e7d32'; // Green
+        ctx.fillStyle = '#2e7d32';
         ctx.fillRect(pipe.x, canvas.height - pipe.bottom, PIPE_WIDTH, pipe.bottom);
-        // Bottom pipe cap
-        ctx.fillStyle = '#1b5e20'; // Dark Green
+        ctx.fillStyle = '#1b5e20';
         ctx.fillRect(pipe.x - 5, canvas.height - pipe.bottom, PIPE_WIDTH + 10, 20);
     });
 }
@@ -206,17 +191,14 @@ function drawPipes() {
 function update() {
     if (!gameRunning || gameOver) return;
 
-    // Bird Physics
     bird.velocity += GRAVITY;
     bird.y += bird.velocity;
 
-    // Collision: Ground or Ceiling
     if (bird.y + bird.height > canvas.height || bird.y < 0) {
         gameOver = true;
         gameRunning = false;
     }
 
-    // Pipes logic
     if (frameCount % PIPE_SPAWN_RATE === 0) {
         const minPipeHeight = 50;
         const maxPipeHeight = canvas.height - PIPE_GAP - minPipeHeight;
@@ -233,7 +215,6 @@ function update() {
     for (let i = pipes.length - 1; i >= 0; i--) {
         pipes[i].x -= PIPE_SPEED;
 
-        // Collision: Bird and Pipe
         if (
             bird.x < pipes[i].x + PIPE_WIDTH &&
             bird.x + bird.width > pipes[i].x &&
@@ -243,14 +224,12 @@ function update() {
             gameRunning = false;
         }
 
-        // Score update
         if (!pipes[i].passed && bird.x > pipes[i].x + PIPE_WIDTH) {
             score++;
             pipes[i].passed = true;
             updateScore();
         }
 
-        // Remove off-screen pipes
         if (pipes[i].x + PIPE_WIDTH < 0) {
             pipes.splice(i, 1);
         }
@@ -260,7 +239,6 @@ function update() {
 }
 
 function draw() {
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     drawPipes();
@@ -294,6 +272,5 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// Initialize
 resizeCanvas();
 gameLoop();
