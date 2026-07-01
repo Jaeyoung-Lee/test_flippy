@@ -30,6 +30,18 @@ let dataArray = null;
 let isMicActive = false;
 let currentVolume = 0;
 let prevVolume = 0;
+// Bird image support: if a file named bird.png (or assets/bird.png) is present, use it.
+let birdImg = new Image();
+let birdImgLoaded = false;
+// Try root then assets folder
+birdImg.src = 'bird.png';
+birdImg.onload = () => { birdImgLoaded = true; console.log('Bird image loaded from bird.png'); };
+birdImg.onerror = () => {
+    // try assets path
+    birdImg.src = 'assets/bird.png';
+    birdImg.onload = () => { birdImgLoaded = true; console.log('Bird image loaded from assets/bird.png'); };
+    birdImg.onerror = () => { console.log('No bird image found; using canvas-drawn sprite.'); };
+};
 
 function resizeCanvas() {
     // Responsive canvas sizing with devicePixelRatio handling
@@ -193,45 +205,43 @@ function drawBird() {
     const y = Math.round(bird.y);
     const w = Math.max(12, Math.round(bird.width));
     const h = Math.max(12, Math.round(bird.height));
+    if (birdImgLoaded) {
+        // Draw image; context is already scaled so coordinates are in CSS pixels
+        try {
+            ctx.drawImage(birdImg, x, y, w, h);
+        } catch (e) {
+            // fallback to canvas sprite on any draw error
+            console.warn('Error drawing bird image, falling back to canvas sprite', e);
+            drawCanvasBird(x, y, w, h);
+        }
+    } else {
+        drawCanvasBird(x, y, w, h);
+    }
+}
 
-    // pixel-size for blocky look
+function drawCanvasBird(x, y, w, h) {
     const px = Math.max(2, Math.floor(Math.min(w, h) / 6));
-
-    // body (yellow) with dark outline
     ctx.fillStyle = '#FFD12A';
     ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = '#3a2b00';
     ctx.lineWidth = Math.max(1, Math.floor(px / 2));
     ctx.strokeRect(x, y, w, h);
-
-    // wing (darker yellow block)
     ctx.fillStyle = '#E6B800';
     ctx.fillRect(x + px, y + Math.floor(h * 0.35), px * 2, px * 2);
-
-    // eye (white) with pupil
     const eyeX = x + Math.floor(w * 0.62);
     const eyeY = y + Math.floor(h * 0.22);
     const eyeR = Math.max(2, Math.floor(px * 1.1));
     ctx.fillStyle = 'white';
-    ctx.beginPath();
-    ctx.arc(eyeX, eyeY, eyeR, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(eyeX, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = 'black';
-    ctx.beginPath();
-    ctx.arc(eyeX + Math.max(1, Math.floor(px * 0.3)), eyeY, Math.max(1, Math.floor(px * 0.6)), 0, Math.PI * 2);
-    ctx.fill();
-
-    // beak: two layered orange blocks (top and bottom)
+    ctx.beginPath(); ctx.arc(eyeX + Math.max(1, Math.floor(px * 0.3)), eyeY, Math.max(1, Math.floor(px * 0.6)), 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#FF6D00';
     const beakW = Math.max(px * 2, Math.floor(w * 0.22));
     const beakH = Math.max(2, px);
     const beakX = x + w - Math.floor(px * 0.1);
     ctx.fillRect(beakX, y + Math.floor(h * 0.45), beakW, beakH);
     ctx.fillRect(beakX, y + Math.floor(h * 0.55), beakW, beakH);
-
-    // small tail block
-    ctx.fillStyle = '#E6B800';
-    ctx.fillRect(x - px, y + Math.floor(h * 0.35), px, px);
+    ctx.fillStyle = '#E6B800'; ctx.fillRect(x - px, y + Math.floor(h * 0.35), px, px);
 }
 
 function drawPipes() {
