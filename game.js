@@ -30,6 +30,7 @@ let dataArray = null;
 let isMicActive = false;
 let currentVolume = 0;
 let prevVolume = 0;
+let prevMaxVolume = 0;
 // Bird image support: if a file named bird.png (or assets/bird.png) is present, use it.
 let birdImg = new Image();
 let birdImgLoaded = false;
@@ -132,9 +133,15 @@ function startVolumeMonitoring() {
     }
 
     // Trigger a jump on the rising edge of a loud sound for responsiveness
-    if (gameRunning && currentVolume > jumpThreshold && prevVolume <= (currentVolume - 20)) {
+    if (gameRunning && currentVolume > jumpThreshold && prevVolume <= jumpThreshold) {
         const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 500));
         bird.velocity = dynamicJump;
+        prevMaxVolume = currentVolume; // Store the peak volume for potential future use
+    }
+    else if (gameRunning && currentVolume > jumpThreshold && prevVolume > (currentVolume+10)) {
+        const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 500));
+        bird.velocity = dynamicJump;
+        prevMaxVolume = currentVolume; // Store the peak volume for potential future use
     }
 
     prevVolume = currentVolume;
