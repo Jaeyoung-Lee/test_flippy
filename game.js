@@ -32,11 +32,22 @@ let currentVolume = 0;
 let prevVolume = 0;
 
 function resizeCanvas() {
-    // Responsive canvas sizing with some padding
-    const maxWidth = Math.max(320, Math.min(420, window.innerWidth - 40));
-    const maxHeight = Math.max(480, Math.min(720, window.innerHeight - 80));
-    canvas.width = maxWidth;
-    canvas.height = maxHeight;
+    // Responsive canvas sizing with devicePixelRatio handling
+    const cssWidth = Math.max(320, Math.min(420, window.innerWidth - 40));
+    const cssHeight = Math.max(480, Math.min(720, window.innerHeight - 80));
+
+    const dpr = window.devicePixelRatio || 1;
+
+    // Set the actual drawing buffer size in device pixels
+    canvas.width = Math.floor(cssWidth * dpr);
+    canvas.height = Math.floor(cssHeight * dpr);
+
+    // Set the CSS size (what the page layout uses)
+    canvas.style.width = cssWidth + 'px';
+    canvas.style.height = cssHeight + 'px';
+
+    // Reset and scale the drawing context so 1 unit = 1 CSS pixel
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
 // [FIXED] Robust Microphone Initialization
