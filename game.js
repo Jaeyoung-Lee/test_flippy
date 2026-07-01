@@ -30,9 +30,9 @@ let dataArray = null;
 let isMicActive = false;
 let currentVolume = 0;
 let prevVolume = 0;
-// Logical (CSS-pixel) canvas dimensions — used by all game logic
-let logicalWidth = 400;
-let logicalHeight = 600;
+// Fixed canvas dimensions (same on all devices)
+const logicalWidth = 400;
+const logicalHeight = 600;
 // Bird image support: if a file named bird.png (or assets/bird.png) is present, use it.
 let birdImg = new Image();
 let birdImgLoaded = false;
@@ -47,26 +47,9 @@ birdImg.onerror = () => {
 };
 
 function resizeCanvas() {
-    // Responsive canvas sizing with devicePixelRatio handling
-    const cssWidth = Math.max(320, Math.min(420, window.innerWidth - 40));
-    const cssHeight = Math.max(480, Math.min(720, window.innerHeight - 80));
-
-    // Store logical (CSS-pixel) dimensions — game logic always uses these
-    logicalWidth = cssWidth;
-    logicalHeight = cssHeight;
-
-    const dpr = window.devicePixelRatio || 1;
-
-    // Set the actual drawing buffer size in device pixels
-    canvas.width = Math.floor(cssWidth * dpr);
-    canvas.height = Math.floor(cssHeight * dpr);
-
-    // Set the CSS size (what the page layout uses)
-    canvas.style.width = cssWidth + 'px';
-    canvas.style.height = cssHeight + 'px';
-
-    // Reset and scale the drawing context so 1 unit = 1 CSS pixel
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Fixed 400x600 canvas — identical on mobile and desktop
+    canvas.width = logicalWidth;
+    canvas.height = logicalHeight;
 }
 
 // [FIXED] Robust Microphone Initialization
@@ -301,5 +284,4 @@ function draw() {
 
 function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
 resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
 gameLoop();

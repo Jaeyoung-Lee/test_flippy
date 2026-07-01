@@ -18,6 +18,10 @@ body {
 canvas {
     display: block;
     background-color: #70c5ce;
+    /* Scale the fixed 400x600 canvas to fit small screens without changing game logic */
+    max-width: 100vw;
+    max-height: 100vh;
+    object-fit: contain;
 }
 
 #score {
