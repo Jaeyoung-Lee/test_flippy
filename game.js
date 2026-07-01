@@ -30,6 +30,9 @@ let dataArray = null;
 let isMicActive = false;
 let currentVolume = 0;
 let prevVolume = 0;
+// Logical (CSS-pixel) canvas dimensions — used by all game logic
+let logicalWidth = 400;
+let logicalHeight = 600;
 // Bird image support: if a file named bird.png (or assets/bird.png) is present, use it.
 let birdImg = new Image();
 let birdImgLoaded = false;
@@ -47,6 +50,10 @@ function resizeCanvas() {
     // Responsive canvas sizing with devicePixelRatio handling
     const cssWidth = Math.max(320, Math.min(420, window.innerWidth - 40));
     const cssHeight = Math.max(480, Math.min(720, window.innerHeight - 80));
+
+    // Store logical (CSS-pixel) dimensions — game logic always uses these
+    logicalWidth = cssWidth;
+    logicalHeight = cssHeight;
 
     const dpr = window.devicePixelRatio || 1;
 
@@ -248,26 +255,26 @@ function drawPipes() {
     pipes.forEach(pipe => {
         ctx.fillStyle = '#2e7d32'; ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.top);
         ctx.fillStyle = '#1b5e20'; ctx.fillRect(pipe.x - 5, pipe.top - 10, PIPE_WIDTH + 10, 20);
-        ctx.fillStyle = '#2e7d32'; ctx.fillRect(pipe.x, canvas.height - pipe.bottom, PIPE_WIDTH, pipe.bottom);
-        ctx.fillStyle = '#1b5e20'; ctx.fillRect(pipe.x - 5, canvas.height - pipe.bottom - 10, PIPE_WIDTH + 10, 20);
+        ctx.fillStyle = '#2e7d32'; ctx.fillRect(pipe.x, logicalHeight - pipe.bottom, PIPE_WIDTH, pipe.bottom);
+        ctx.fillStyle = '#1b5e20'; ctx.fillRect(pipe.x - 5, logicalHeight - pipe.bottom - 10, PIPE_WIDTH + 10, 20);
     });
 }
 
 function update() {
     if (!gameRunning || gameOver) return;
     bird.velocity += GRAVITY; bird.y += bird.velocity;
-    if (bird.y + bird.height > canvas.height || bird.y < 0) { gameOver = true; gameRunning = false; }
+    if (bird.y + bird.height > logicalHeight || bird.y < 0) { gameOver = true; gameRunning = false; }
 
     if (frameCount % PIPE_SPAWN_RATE === 0) {
-        const minH = 50, maxH = canvas.height - PIPE_GAP - minH;
+        const minH = 50, maxH = logicalHeight - PIPE_GAP - minH;
         const topH = Math.floor(Math.random() * (maxH - minH + 1)) + minH;
-        pipes.push({ x: canvas.width, top: topH, bottom: canvas.height - topH - PIPE_GAP, passed: false });
+        pipes.push({ x: logicalWidth, top: topH, bottom: logicalHeight - topH - PIPE_GAP, passed: false });
     }
 
     for (let i = pipes.length - 1; i >= 0; i--) {
         pipes[i].x -= PIPE_SPEED;
         if (bird.x < pipes[i].x + PIPE_WIDTH && bird.x + bird.width > pipes[i].x &&
-            (bird.y < pipes[i].top || bird.y + bird.height > canvas.height - pipes[i].bottom)) {
+            (bird.y < pipes[i].top || bird.y + bird.height > logicalHeight - pipes[i].bottom)) {
             gameOver = true; gameRunning = false;
         }
         if (!pipes[i].passed && bird.x > pipes[i].x + PIPE_WIDTH) { score++; pipes[i].passed = true; updateScore(); }
@@ -277,18 +284,18 @@ function update() {
 }
 
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
     drawPipes(); drawBird();
     if (!gameRunning && !gameOver) {
-        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(0, 0, logicalWidth, logicalHeight);
         ctx.fillStyle = 'white'; ctx.font = '24px Arial'; ctx.textAlign = 'center';
-        ctx.fillText('Press Space or Click to Start', canvas.width/2, canvas.height/2);
+        ctx.fillText('Press Space or Click to Start', logicalWidth/2, logicalHeight/2);
     }
     if (gameOver) {
-        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, logicalWidth, logicalHeight);
         ctx.fillStyle = 'white'; ctx.font = '40px Arial'; ctx.textAlign = 'center';
-        ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2 - 20);
-        ctx.font = '24px Arial'; ctx.fillText(`Score: ${score}`, canvas.width/2, canvas.height/2 + 20);
+        ctx.fillText('GAME OVER', logicalWidth/2, logicalHeight/2 - 20);
+        ctx.font = '24px Arial'; ctx.fillText(`Score: ${score}`, logicalWidth/2, logicalHeight/2 + 20);
     }
 }
 
