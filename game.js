@@ -120,7 +120,7 @@ function startVolumeMonitoring() {
     }
 
     // Trigger a jump on the rising edge of a loud sound for responsiveness
-    if (gameRunning && currentVolume > jumpThreshold && prevVolume <= (jumpThreshold+10)) {
+    if (gameRunning && currentVolume > jumpThreshold && prevVolume <= (currentVolume-20)) {
         const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 200));
         bird.velocity = dynamicJump;
     }
@@ -178,8 +178,49 @@ function resetGame() {
 function updateScore() { scoreElement.innerText = `Score: ${score}`; }
 
 function drawBird() {
-    ctx.fillStyle = 'black'; ctx.fillRect(bird.x, bird.y, bird.width, bird.height);
-    ctx.fillStyle = '#FFD700'; ctx.fillRect(bird.x + 2, bird.y + 2, bird.width - 4, bird.height - 4);
+    const x = Math.round(bird.x);
+    const y = Math.round(bird.y);
+    const w = Math.max(12, Math.round(bird.width));
+    const h = Math.max(12, Math.round(bird.height));
+
+    // pixel-size for blocky look
+    const px = Math.max(2, Math.floor(Math.min(w, h) / 6));
+
+    // body (yellow) with dark outline
+    ctx.fillStyle = '#FFD12A';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#3a2b00';
+    ctx.lineWidth = Math.max(1, Math.floor(px / 2));
+    ctx.strokeRect(x, y, w, h);
+
+    // wing (darker yellow block)
+    ctx.fillStyle = '#E6B800';
+    ctx.fillRect(x + px, y + Math.floor(h * 0.35), px * 2, px * 2);
+
+    // eye (white) with pupil
+    const eyeX = x + Math.floor(w * 0.62);
+    const eyeY = y + Math.floor(h * 0.22);
+    const eyeR = Math.max(2, Math.floor(px * 1.1));
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(eyeX, eyeY, eyeR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'black';
+    ctx.beginPath();
+    ctx.arc(eyeX + Math.max(1, Math.floor(px * 0.3)), eyeY, Math.max(1, Math.floor(px * 0.6)), 0, Math.PI * 2);
+    ctx.fill();
+
+    // beak: two layered orange blocks (top and bottom)
+    ctx.fillStyle = '#FF6D00';
+    const beakW = Math.max(px * 2, Math.floor(w * 0.22));
+    const beakH = Math.max(2, px);
+    const beakX = x + w - Math.floor(px * 0.1);
+    ctx.fillRect(beakX, y + Math.floor(h * 0.45), beakW, beakH);
+    ctx.fillRect(beakX, y + Math.floor(h * 0.55), beakW, beakH);
+
+    // small tail block
+    ctx.fillStyle = '#E6B800';
+    ctx.fillRect(x - px, y + Math.floor(h * 0.35), px, px);
 }
 
 function drawPipes() {
