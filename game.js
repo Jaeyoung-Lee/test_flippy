@@ -8,7 +8,7 @@ console.log("Software Version: v1.0.8 (Final Audio Pipeline Fix)");
 
 // Game Constants
 const GRAVITY = 0.25;
-const JUMP_STRENGTH = -5;
+const JUMP_STRENGTH = -4;
 const PIPE_SPEED = 2.5;
 const PIPE_SPAWN_RATE = 90;
 const PIPE_GAP = 160;
@@ -121,7 +121,7 @@ function startVolumeMonitoring() {
         volumeDisplay.innerText = `Volume: ${Math.round(currentVolume)}`;
     }
 
-    const jumpThreshold = 40; // same threshold used in handleAction
+    const jumpThreshold = 100; // same threshold used in handleAction
 
     // If user speaks loudly before starting, auto-start the game
     if (!gameRunning && !gameOver && currentVolume > jumpThreshold) {
@@ -132,8 +132,8 @@ function startVolumeMonitoring() {
     }
 
     // Trigger a jump on the rising edge of a loud sound for responsiveness
-    if (gameRunning && currentVolume > jumpThreshold && prevVolume <= (currentVolume - 10)) {
-        const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 60));
+    if (gameRunning && currentVolume > jumpThreshold && prevVolume <= (currentVolume - 20)) {
+        const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 500));
         bird.velocity = dynamicJump;
     }
 
