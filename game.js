@@ -29,10 +29,14 @@ let analyser = null;
 let dataArray = null;
 let isMicActive = false;
 let currentVolume = 0;
+let prevVolume = 0;
 
 function resizeCanvas() {
-    canvas.width = 400;
-    canvas.height = 600;
+    // Responsive canvas sizing with some padding
+    const maxWidth = Math.max(320, Math.min(420, window.innerWidth - 40));
+    const maxHeight = Math.max(480, Math.min(720, window.innerHeight - 80));
+    canvas.width = maxWidth;
+    canvas.height = maxHeight;
 }
 
 // [FIXED] Robust Microphone Initialization
@@ -41,6 +45,13 @@ async function getMicrophoneAccess() {
         console.log("Requesting microphone access...");
         micBtn.innerText = "⌛ Loading...";
         micBtn.disabled = true;
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            micBtn.innerText = "🎤 마이크 시작";
+            micBtn.disabled = false;
+            alert('Error: getUserMedia is not supported in this browser or context.\nServe the page over HTTPS or use localhost.');
+            return;
+        }
 
         const stream = await navigator.mediaDevices.getUserMedia({ 
             audio: {
@@ -86,17 +97,35 @@ function startVolumeMonitoring() {
     if (!isMicActive || !analyser || !dataArray) return;
 
     analyser.getByteFrequencyData(dataArray);
-    
+
     let sum = 0;
-    // Focus on lower frequencies where human voice/claps are most prominent
-    for (let i = 0; i < 20; i++) {
+    const voiceBins = Math.min(20, dataArray.length);
+    for (let i = 0; i < voiceBins; i++) {
         sum += dataArray[i];
     }
-    currentVolume = sum / 20;
+    currentVolume = sum / voiceBins;
 
     if (volumeDisplay) {
         volumeDisplay.innerText = `Volume: ${Math.round(currentVolume)}`;
     }
+
+    const jumpThreshold = 40; // same threshold used in handleAction
+
+    // If user speaks loudly before starting, auto-start the game
+    if (!gameRunning && !gameOver && currentVolume > jumpThreshold) {
+        gameRunning = true;
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    // Trigger a jump on the rising edge of a loud sound for responsiveness
+    if (gameRunning && currentVolume > jumpThreshold && prevVolume <= jumpThreshold) {
+        const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 60));
+        bird.velocity = dynamicJump;
+    }
+
+    prevVolume = currentVolume;
 
     // High frequency polling for responsiveness
     requestAnimationFrame(startVolumeMonitoring);
@@ -106,6 +135,8 @@ function startVolumeMonitoring() {
 window.addEventListener('keydown', (e) => { if (e.code === 'Space') handleAction(); });
 canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleAction(); }, { passive: false });
 canvas.addEventListener('mousedown', () => { handleAction(); });
+// Microphone button handler
+if (micBtn) micBtn.addEventListener('click', () => { if (!isMicActive) getMicrophoneAccess(); });
 
 function handleAction() {
     if (gameOver) {
@@ -200,4 +231,6 @@ function draw() {
 }
 
 function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
-resizeCanvas(); gameLoop();
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+gameLoop();
