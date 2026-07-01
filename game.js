@@ -7,10 +7,10 @@ const volumeDisplay = document.getElementById('volume-display');
 console.log("Software Version: v1.0.8 (Final Audio Pipeline Fix)");
 
 // Game Constants
-const GRAVITY = 0.2;
-const JUMP_STRENGTH = -3;
+const GRAVITY = 0.25;
+const JUMP_STRENGTH = -5;
 const PIPE_SPEED = 2.5;
-const PIPE_SPAWN_RATE = 120;
+const PIPE_SPAWN_RATE = 90;
 const PIPE_GAP = 160;
 const PIPE_WIDTH = 50;
 const BIRD_SIZE = 30;
@@ -30,9 +30,6 @@ let dataArray = null;
 let isMicActive = false;
 let currentVolume = 0;
 let prevVolume = 0;
-// Fixed canvas dimensions (same on all devices)
-const logicalWidth = 400;
-const logicalHeight = 600;
 // Bird image support: if a file named bird.png (or assets/bird.png) is present, use it.
 let birdImg = new Image();
 let birdImgLoaded = false;
@@ -47,9 +44,11 @@ birdImg.onerror = () => {
 };
 
 function resizeCanvas() {
-    // Fixed 400x600 canvas — identical on mobile and desktop
-    canvas.width = logicalWidth;
-    canvas.height = logicalHeight;
+    // Responsive canvas sizing with some padding
+    const maxWidth = Math.max(320, Math.min(420, window.innerWidth - 40));
+    const maxHeight = Math.max(480, Math.min(720, window.innerHeight - 80));
+    canvas.width = maxWidth;
+    canvas.height = maxHeight;
 }
 
 // [FIXED] Robust Microphone Initialization
@@ -122,7 +121,7 @@ function startVolumeMonitoring() {
         volumeDisplay.innerText = `Volume: ${Math.round(currentVolume)}`;
     }
 
-    const jumpThreshold = 80; // same threshold used in handleAction
+    const jumpThreshold = 40; // same threshold used in handleAction
 
     // If user speaks loudly before starting, auto-start the game
     if (!gameRunning && !gameOver && currentVolume > jumpThreshold) {
@@ -133,8 +132,8 @@ function startVolumeMonitoring() {
     }
 
     // Trigger a jump on the rising edge of a loud sound for responsiveness
-    if (gameRunning && currentVolume > jumpThreshold && prevVolume <= (currentVolume-20)) {
-        const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 200));
+    if (gameRunning && currentVolume > jumpThreshold && prevVolume <= (currentVolume - 10)) {
+        const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 60));
         bird.velocity = dynamicJump;
     }
 
@@ -167,9 +166,9 @@ function handleAction() {
     }
 
     // Jump logic based on volume OR click/space fallback
-    const jumpThreshold = 80; // Adjust this for sensitivity
+    const jumpThreshold = 40; // Adjust this for sensitivity
     if (isMicActive && currentVolume > jumpThreshold) {
-        const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 200));
+        const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 60));
         bird.velocity = dynamicJump;
     } else if (!isMicActive || currentVolume <= jumpThreshold) {
         // If user is clicking/pressing space, we still want a standard jump
@@ -191,73 +190,45 @@ function resetGame() {
 function updateScore() { scoreElement.innerText = `Score: ${score}`; }
 
 function drawBird() {
-    const x = Math.round(bird.x);
-    const y = Math.round(bird.y);
-    const w = Math.max(12, Math.round(bird.width));
-    const h = Math.max(12, Math.round(bird.height));
+    // If a bird image is available, draw it; otherwise draw the original square bird
     if (birdImgLoaded) {
-        // Draw image; context is already scaled so coordinates are in CSS pixels
         try {
-            ctx.drawImage(birdImg, x, y, w, h);
+            ctx.drawImage(birdImg, bird.x, bird.y, bird.width, bird.height);
+            return;
         } catch (e) {
-            // fallback to canvas sprite on any draw error
             console.warn('Error drawing bird image, falling back to canvas sprite', e);
-            drawCanvasBird(x, y, w, h);
         }
-    } else {
-        drawCanvasBird(x, y, w, h);
     }
-}
 
-function drawCanvasBird(x, y, w, h) {
-    const px = Math.max(2, Math.floor(Math.min(w, h) / 6));
-    ctx.fillStyle = '#FFD12A';
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = '#3a2b00';
-    ctx.lineWidth = Math.max(1, Math.floor(px / 2));
-    ctx.strokeRect(x, y, w, h);
-    ctx.fillStyle = '#E6B800';
-    ctx.fillRect(x + px, y + Math.floor(h * 0.35), px * 2, px * 2);
-    const eyeX = x + Math.floor(w * 0.62);
-    const eyeY = y + Math.floor(h * 0.22);
-    const eyeR = Math.max(2, Math.floor(px * 1.1));
-    ctx.fillStyle = 'white';
-    ctx.beginPath(); ctx.arc(eyeX, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'black';
-    ctx.beginPath(); ctx.arc(eyeX + Math.max(1, Math.floor(px * 0.3)), eyeY, Math.max(1, Math.floor(px * 0.6)), 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#FF6D00';
-    const beakW = Math.max(px * 2, Math.floor(w * 0.22));
-    const beakH = Math.max(2, px);
-    const beakX = x + w - Math.floor(px * 0.1);
-    ctx.fillRect(beakX, y + Math.floor(h * 0.45), beakW, beakH);
-    ctx.fillRect(beakX, y + Math.floor(h * 0.55), beakW, beakH);
-    ctx.fillStyle = '#E6B800'; ctx.fillRect(x - px, y + Math.floor(h * 0.35), px, px);
+    // original square bird
+    ctx.fillStyle = 'black'; ctx.fillRect(bird.x, bird.y, bird.width, bird.height);
+    ctx.fillStyle = '#FFD700'; ctx.fillRect(bird.x + 2, bird.y + 2, bird.width - 4, bird.height - 4);
 }
 
 function drawPipes() {
     pipes.forEach(pipe => {
         ctx.fillStyle = '#2e7d32'; ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.top);
-        ctx.fillStyle = '#1b5e20'; ctx.fillRect(pipe.x - 5, pipe.top - 10, PIPE_WIDTH + 10, 20);
-        ctx.fillStyle = '#2e7d32'; ctx.fillRect(pipe.x, logicalHeight - pipe.bottom, PIPE_WIDTH, pipe.bottom);
-        ctx.fillStyle = '#1b5e20'; ctx.fillRect(pipe.x - 5, logicalHeight - pipe.bottom - 10, PIPE_WIDTH + 10, 20);
+        ctx.fillStyle = '#1b5e20'; ctx.fillRect(pipe.x - 5, pipe.top - 20, PIPE_WIDTH + 10, 20);
+        ctx.fillStyle = '#2e7d32'; ctx.fillRect(pipe.x, canvas.height - pipe.bottom, PIPE_WIDTH, pipe.bottom);
+        ctx.fillStyle = '#1b5e20'; ctx.fillRect(pipe.x - 5, canvas.height - pipe.bottom - 20, PIPE_WIDTH + 10, 20);
     });
 }
 
 function update() {
     if (!gameRunning || gameOver) return;
     bird.velocity += GRAVITY; bird.y += bird.velocity;
-    if (bird.y + bird.height > logicalHeight || bird.y < 0) { gameOver = true; gameRunning = false; }
+    if (bird.y + bird.height > canvas.height || bird.y < 0) { gameOver = true; gameRunning = false; }
 
     if (frameCount % PIPE_SPAWN_RATE === 0) {
-        const minH = 50, maxH = logicalHeight - PIPE_GAP - minH;
+        const minH = 50, maxH = canvas.height - PIPE_GAP - minH;
         const topH = Math.floor(Math.random() * (maxH - minH + 1)) + minH;
-        pipes.push({ x: logicalWidth, top: topH, bottom: logicalHeight - topH - PIPE_GAP, passed: false });
+        pipes.push({ x: canvas.width, top: topH, bottom: canvas.height - topH - PIPE_GAP, passed: false });
     }
 
     for (let i = pipes.length - 1; i >= 0; i--) {
         pipes[i].x -= PIPE_SPEED;
         if (bird.x < pipes[i].x + PIPE_WIDTH && bird.x + bird.width > pipes[i].x &&
-            (bird.y < pipes[i].top || bird.y + bird.height > logicalHeight - pipes[i].bottom)) {
+            (bird.y < pipes[i].top || bird.y + bird.height > canvas.height - pipes[i].bottom)) {
             gameOver = true; gameRunning = false;
         }
         if (!pipes[i].passed && bird.x > pipes[i].x + PIPE_WIDTH) { score++; pipes[i].passed = true; updateScore(); }
@@ -267,18 +238,18 @@ function update() {
 }
 
 function draw() {
-    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawPipes(); drawBird();
     if (!gameRunning && !gameOver) {
-        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = 'white'; ctx.font = '24px Arial'; ctx.textAlign = 'center';
-        ctx.fillText('Press Space or Click to Start', logicalWidth/2, logicalHeight/2);
+        ctx.fillText('Press Space or Click to Start', canvas.width/2, canvas.height/2);
     }
     if (gameOver) {
-        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = 'white'; ctx.font = '40px Arial'; ctx.textAlign = 'center';
-        ctx.fillText('GAME OVER', logicalWidth/2, logicalHeight/2 - 20);
-        ctx.font = '24px Arial'; ctx.fillText(`Score: ${score}`, logicalWidth/2, logicalHeight/2 + 20);
+        ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2 - 20);
+        ctx.font = '24px Arial'; ctx.fillText(`Score: ${score}`, canvas.width/2, canvas.height/2 + 20);
     }
 }
 
