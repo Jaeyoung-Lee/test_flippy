@@ -7,10 +7,10 @@ const volumeDisplay = document.getElementById('volume-display');
 console.log("Software Version: v1.0.8 (Final Audio Pipeline Fix)");
 
 // Game Constants
-const GRAVITY = 0.25;
-const JUMP_STRENGTH = -5;
+const GRAVITY = 0.2;
+const JUMP_STRENGTH = -3;
 const PIPE_SPEED = 2.5;
-const PIPE_SPAWN_RATE = 90;
+const PIPE_SPAWN_RATE = 120;
 const PIPE_GAP = 160;
 const PIPE_WIDTH = 50;
 const BIRD_SIZE = 30;
@@ -109,7 +109,7 @@ function startVolumeMonitoring() {
         volumeDisplay.innerText = `Volume: ${Math.round(currentVolume)}`;
     }
 
-    const jumpThreshold = 40; // same threshold used in handleAction
+    const jumpThreshold = 80; // same threshold used in handleAction
 
     // If user speaks loudly before starting, auto-start the game
     if (!gameRunning && !gameOver && currentVolume > jumpThreshold) {
@@ -120,8 +120,8 @@ function startVolumeMonitoring() {
     }
 
     // Trigger a jump on the rising edge of a loud sound for responsiveness
-    if (gameRunning && currentVolume > jumpThreshold && prevVolume <= jumpThreshold) {
-        const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 60));
+    if (gameRunning && currentVolume > jumpThreshold && prevVolume <= (jumpThreshold+10)) {
+        const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 200));
         bird.velocity = dynamicJump;
     }
 
@@ -154,9 +154,9 @@ function handleAction() {
     }
 
     // Jump logic based on volume OR click/space fallback
-    const jumpThreshold = 40; // Adjust this for sensitivity
+    const jumpThreshold = 80; // Adjust this for sensitivity
     if (isMicActive && currentVolume > jumpThreshold) {
-        const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 60));
+        const dynamicJump = JUMP_STRENGTH * (1 + (currentVolume / 200));
         bird.velocity = dynamicJump;
     } else if (!isMicActive || currentVolume <= jumpThreshold) {
         // If user is clicking/pressing space, we still want a standard jump
@@ -185,9 +185,9 @@ function drawBird() {
 function drawPipes() {
     pipes.forEach(pipe => {
         ctx.fillStyle = '#2e7d32'; ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.top);
-        ctx.fillStyle = '#1b5e20'; ctx.fillRect(pipe.x - 5, pipe.top - 20, PIPE_WIDTH + 10, 20);
+        ctx.fillStyle = '#1b5e20'; ctx.fillRect(pipe.x - 5, pipe.top - 10, PIPE_WIDTH + 10, 20);
         ctx.fillStyle = '#2e7d32'; ctx.fillRect(pipe.x, canvas.height - pipe.bottom, PIPE_WIDTH, pipe.bottom);
-        ctx.fillStyle = '#1b5e20'; ctx.fillRect(pipe.x - 5, canvas.height - pipe.bottom - 20, PIPE_WIDTH + 10, 20);
+        ctx.fillStyle = '#1b5e20'; ctx.fillRect(pipe.x - 5, canvas.height - pipe.bottom - 10, PIPE_WIDTH + 10, 20);
     });
 }
 
